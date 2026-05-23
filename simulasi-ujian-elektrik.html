@@ -1,0 +1,1730 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Simulasi Ujian Operasional Elektrik</title>
+  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+  <style>
+    /* Custom scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #f1f5f9;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+
+    /* Hide scrollbar for nav */
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans antialiased min-h-screen flex flex-col selection:bg-blue-200">
+
+  <div id="app" class="flex-grow flex flex-col">
+    <!-- Main Header -->
+    <header class="bg-white border-b border-slate-200 shadow-sm sticky top-0 z-20 h-16 flex items-center">
+      <div class="max-w-4xl mx-auto px-4 w-full flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-9 h-9 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center text-white shadow-md">
+            <i class="fas fa-bolt text-lg"></i>
+          </div>
+          <h1 class="font-extrabold text-xl text-slate-800 tracking-tight">OPERASIONAL <span class="text-blue-600">ELEKTRIK</span></h1>
+        </div>
+      </div>
+    </header>
+
+    <!-- Category Navigation Menu -->
+    <nav class="bg-white/90 backdrop-blur-md border-b border-slate-200 shadow-sm sticky top-16 z-10">
+      <div class="max-w-4xl mx-auto px-4 py-3 flex gap-2 overflow-x-auto no-scrollbar items-center">
+        <button v-for="(cat, key) in categories" :key="key"
+          @click="currentCategory = key"
+          class="flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold transition-colors whitespace-nowrap border-2"
+          :class="currentCategory === key ? 'bg-blue-50 border-blue-600 text-blue-700 shadow-sm' : 'bg-white border-slate-100 text-slate-500 hover:border-blue-200 hover:text-blue-600 hover:bg-slate-50'">
+          <i :class="cat.icon"></i>
+          {{ cat.title }}
+          <span v-if="state[key].isFinished" class="ml-1.5 w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center text-[10px]">
+            <i class="fas fa-check"></i>
+          </span>
+        </button>
+      </div>
+    </nav>
+
+    <main class="flex-grow flex flex-col items-center p-4 sm:p-8">
+      <div class="max-w-4xl w-full">
+
+        <!-- RESULT SCREEN (If category is finished) -->
+        <div v-if="activeState.isFinished" :key="`result-${currentCategory}`" class="w-full">
+          <div class="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden mb-8">
+            <div class="bg-gradient-to-r from-blue-600 to-indigo-700 p-10 text-center text-white relative overflow-hidden">
+              <!-- Decorative background icons -->
+              <i class="fas fa-check-circle absolute -right-10 -bottom-10 text-9xl opacity-10"></i>
+              <h2 class="text-3xl font-extrabold mb-2 relative z-10">Simulasi Selesai!</h2>
+              <p class="text-blue-100 mb-8 relative z-10">
+                Anda telah menyelesaikan tes untuk kategori <strong>{{ categoryTitle }}</strong>
+              </p>
+
+              <div class="inline-block bg-white/20 backdrop-blur-sm rounded-2xl p-6 border border-white/30 relative z-10">
+                <div class="text-5xl font-black mb-1">
+                  {{ activeState.score }} <span class="text-2xl text-blue-200 font-medium">/ {{ totalQuestions }}</span>
+                </div>
+                <p class="text-sm font-bold uppercase tracking-widest text-blue-100">
+                  Skor (Percobaan Pertama)
+                </p>
+              </div>
+            </div>
+
+            <!-- Action Footer (Retry Button) -->
+            <div class="p-6 bg-slate-50 border-t border-slate-200 flex justify-center">
+              <button @click="retryCategory" class="px-8 py-3 bg-white border-2 border-slate-200 text-slate-700 hover:text-blue-600 hover:border-blue-600 rounded-xl font-bold shadow-sm transition-colors flex items-center gap-2">
+                <i class="fas fa-redo"></i> Ulangi Kategori Ini
+              </button>
+            </div>
+          </div>
+
+          <!-- Evaluasi (Salah pada percobaan pertama) -->
+          <div v-if="activeState.wrongQuestions.length > 0">
+            <div class="flex items-center gap-3 mb-6 px-2">
+              <div class="w-10 h-10 rounded-xl bg-red-100 flex items-center justify-center text-red-600 text-xl shadow-sm border border-red-200">
+                <i class="fas fa-clipboard-list"></i>
+              </div>
+              <h3 class="text-2xl font-bold text-slate-800">Evaluasi Pembelajaran</h3>
+            </div>
+            <p class="text-slate-500 font-medium mb-6 px-2">
+              Berikut adalah soal-soal yang salah Anda jawab pada percobaan pertama beserta jawaban yang benar.
+            </p>
+
+            <div class="space-y-4">
+              <div v-for="(item, index) in activeState.wrongQuestions" :key="index" class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 border-l-4 border-l-red-500 hover:shadow-md transition-shadow">
+                <div class="flex gap-4">
+                  <div class="flex-shrink-0 w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center font-bold text-slate-500 text-sm border border-slate-200">
+                    {{ item.originalIndex + 1 }}
+                  </div>
+                  <div class="flex-grow">
+                    <p class="font-medium text-slate-800 mb-4 leading-relaxed">
+                      {{ item.question.text }}
+                    </p>
+                    <div class="bg-emerald-50 rounded-xl p-4 border border-emerald-100">
+                      <p class="text-xs font-bold text-emerald-600 uppercase tracking-wider mb-2">
+                        <i class="fas fa-check-circle mr-1"></i> Jawaban Benar:
+                      </p>
+                      <p class="font-bold text-emerald-800">
+                        {{ getCorrectAnswerText(item) }}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div v-else class="bg-emerald-50 border border-emerald-200 rounded-2xl p-10 text-center text-emerald-800 shadow-sm">
+            <div class="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-4 border-4 border-white shadow-sm">
+              <i class="fas fa-award text-4xl text-emerald-500"></i>
+            </div>
+            <h3 class="text-3xl font-extrabold mb-2">Sempurna!</h3>
+            <p class="font-medium">
+              Anda menjawab semua soal di kategori ini dengan benar pada percobaan pertama. Luar biasa!
+            </p>
+          </div>
+        </div>
+
+        <!-- QUIZ SCREEN -->
+        <div v-else :key="`quiz-${currentCategory}-${activeState.currentIndex}`" class="max-w-3xl mx-auto">
+          <!-- Progress Header -->
+          <div class="mb-8">
+            <div class="flex justify-between items-end mb-2">
+              <div>
+                <span class="text-xs font-bold text-slate-400 uppercase tracking-wider">{{ categoryTitle }}</span>
+                <h3 class="text-lg font-bold text-slate-700">Soal {{ activeState.currentIndex + 1 }} <span class="text-slate-400 text-sm font-medium">dari {{ totalQuestions }}</span></h3>
+              </div>
+              <span class="text-sm font-bold text-blue-600">{{ Math.round(progressPercent) }}%</span>
+            </div>
+            <div class="h-2.5 w-full bg-slate-200 rounded-full overflow-hidden">
+              <div class="h-full bg-blue-600 transition-all duration-300 relative" :style="{ width: progressPercent + '%' }"></div>
+            </div>
+          </div>
+
+          <!-- Question Card -->
+          <div class="bg-white rounded-3xl shadow-sm border border-slate-200 overflow-hidden relative" :class="{ 'pointer-events-none': isTransitioning }">
+            <div class="p-6 sm:p-8 md:p-10">
+              <h2 class="text-xl md:text-2xl font-semibold text-slate-800 leading-relaxed mb-8">
+                {{ currentQuestion.text }}
+              </h2>
+
+              <!-- Options: Single Choice -->
+              <div v-if="categoryType === 'single'" class="flex flex-col gap-3">
+                <div v-for="(option, index) in currentQuestion.options" :key="index"
+                  @click="selectOption(index)"
+                  class="relative flex items-center p-4 border-2 rounded-2xl cursor-pointer transition-colors group"
+                  :class="getOptionClass(index)">
+
+                  <div class="w-7 h-7 rounded-full border-2 flex items-center justify-center mr-4 flex-shrink-0 transition-colors" :class="getIconWrapperClass(index)">
+                    <i :class="getIconClass(index)"></i>
+                  </div>
+                  <span class="font-medium text-lg">{{ option }}</span>
+                </div>
+              </div>
+
+              <!-- Options: Multiple Choice -->
+              <div v-else-if="categoryType === 'multiple'" class="flex flex-col gap-3">
+                <div class="flex items-center gap-2 mb-3 bg-blue-50 text-blue-700 px-4 py-3 rounded-xl border border-blue-100">
+                  <i class="fas fa-info-circle"></i>
+                  <p class="font-semibold text-sm">
+                    Pilih <span class="font-bold underline">{{ currentQuestion.answer.length }}</span> jawaban yang tepat.
+                  </p>
+                </div>
+
+                <div v-for="(option, index) in currentQuestion.options" :key="index"
+                  @click="selectOption(index)"
+                  class="relative flex items-center p-4 border-2 rounded-2xl cursor-pointer transition-colors group"
+                  :class="getOptionClass(index)">
+
+                  <div class="w-7 h-7 rounded border-2 flex items-center justify-center mr-4 flex-shrink-0 transition-colors" :class="getIconWrapperClass(index, true)">
+                    <i :class="getIconClass(index)"></i>
+                  </div>
+                  <span class="font-medium text-lg">{{ option }}</span>
+                </div>
+              </div>
+
+              <!-- Options: True/False (Redesigned) -->
+              <div v-else-if="categoryType === 'boolean'" class="flex flex-col sm:flex-row gap-4">
+                <button @click="selectOption(1)"
+                  class="flex-1 flex items-center justify-center gap-3 py-6 rounded-2xl border-2 text-xl font-bold transition-colors cursor-pointer"
+                  :class="getBooleanClass(1)">
+                  <i class="fas fa-check-circle text-2xl"></i> Benar
+                </button>
+
+                <button @click="selectOption(0)"
+                  class="flex-1 flex items-center justify-center gap-3 py-6 rounded-2xl border-2 text-xl font-bold transition-colors cursor-pointer"
+                  :class="getBooleanClass(0)">
+                  <i class="fas fa-times-circle text-2xl"></i> Salah
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </main>
+  </div>
+
+  <script>
+    // --- DATA INJECTION ---
+    const bankPilihanGanda = [{
+      "id": 1,
+      "text": "Ruang Isolasi Peralatan Tegangan Tinggi Dalam Ruangan Dilengkapi Dengan Pembatas, Ketinggian Pembatas Di Atas ... Dan Dipasang Serta Dikunci Dengan Kuat",
+      "options": ["1.7",
+        "1.5",
+        "1.0",
+        "2.0"],
+      "answer": "A"
+    },
+      {
+        "id": 2,
+        "text": "Ketika Suhu Trafo Naik, Nilai Pengukuran Resistansi Isolasi ...",
+        "options": ["Meningkat",
+          "Menurun",
+          "Tetap Tidak Berubah",
+          "Meningkat Secara Proporsional"],
+        "answer": "B"
+      },
+      {
+        "id": 3,
+        "text": "Apabila Terjadi Gangguan Hubung Singkat Pada Suatu Sistem Tenaga Listrik Pada Saat Beroperasi, Biasanya Disertai Dengan Tegangan...",
+        "options": ["Naik Secara Signifikan",
+          "Menurun Drastis",
+          "Menjadi Lebih Stabil",
+          "Tidak Terpengaruh"],
+        "answer": "B"
+      },
+      {
+        "id": 4,
+        "text": "Pentanahan Dua Titik Terjadi Dalam Sistem Dc ,Akan Membuat Pemutus Sirkuit?",
+        "options": ["Menolakan  Bergerak",
+          ".Malfungsi",
+          "Malfungsi Atau Menolakan Bergerak",
+          "Terbakar Habis"],
+        "answer": "C"
+      },
+      {
+        "id": 5,
+        "text": "Ketika Kutub Negatif Dari Sistem Dc Benar-Benar Diarde Tegangan Positif Ke Ground Maka...",
+        "options": ["Ditinggikan Ke Tegangan Interpole",
+          "Menurun",
+          "Tidak Ada Perubahan",
+          "Meningkat Sedikit"],
+        "answer": "A"
+      },
+      {
+        "id": 6,
+        "text": "Ketika Osilasi Terjadi Pada Sistem Tenaga,Tegangan Dan Arus Di Setiap Titik….",
+        "options": ["Semuanya Berayun Maju Mundur",
+          "Semuanya Mengalami Perubahan Mendadak",
+          "Perubahan Mendadak Akan Terjadi Bila Frekuensi Osilasi Tinggi",
+          "Tidak Ada Perubahan"],
+        "answer": "A"
+      },
+      {
+        "id": 7,
+        "text": "Multimeter pada dasarnya adalah meter (  ) dengan penyearah.",
+        "options": ["Elektromagnetik",
+          "Magnetik",
+          "Listrik",
+          "Tegangan kecil"],
+        "answer": "B"
+      },
+      {
+        "id": 8,
+        "text": "Ketika relay saat ini digunakan, kumparan menariknya terhubung secara (  ) melalui trafo arus dalam rangkaian yang dikontrol.",
+        "options": ["Pararel",
+          "Seri",
+          "Seri ataupun pararel",
+          "Tetap"],
+        "answer": "C"
+      },
+      {
+        "id": 9,
+        "text": "Arah medan magnet yang dihasilkan oleh kumparan energi tidak hanya terkait dengan arah arus, tetapi juga terkait dengan (  ) lilitan kumparan.  Lainnya",
+        "options": ["Panjang",
+          "Berliku",
+          "Volume",
+          "Berputar"],
+        "answer": "C"
+      },
+      {
+        "id": 10,
+        "text": "Setelah Perintah Start-Up Dikeluarkan ----- Jika Tekanan Tidak Berhasil Dibangun, Regulator Akan Menilai Bahwa Start-Up Telah Gagal, Mengirimkan Sinyal Alarm Yang Sesuai, Dan Memutus Catu Daya Start-Up",
+        "options": ["Dalam Waktu 8 Detik",
+          "Dalam Waktu 10 Detik",
+          "Dalam Waktu 5 Detik",
+          "Dalam Waktu 30 Detik"],
+        "answer": "A"
+      },
+      {
+        "id": 11,
+        "text": "Sebelum Memasang Pelat Tekanan Keluaran Diferensial Trafo Utama, ----- Harus Dipasang Terlebih Dahulu, Lalu Dipasang.",
+        "options": ["Gunakan Voltmeter Dc Untuk Mengukur Bahwa Tidak Ada",
+          "Periksa Apakah Sambungan Berada Pada Posisi Terbuka",
+          "Setelah Memeriksa Apakah Potongan Penghubung Proteksi Lainnya Sudah Terpasang",
+          "Setelah Memeriksa Apakah Relai Diferensial Dalam Kondisi Baik"],
+        "answer": "A"
+      },
+      {
+        "id": 12,
+        "text": "Batas Kenaikan Suhu Suhu Belitan Transformator Tipe Kering Adalah",
+        "options": ["100℃",
+          ".90℃",
+          "90℃",
+          "60℃"],
+        "answer": "A"
+      },
+      {
+        "id": 13,
+        "text": "Inti Transformator Harus….",
+        "options": ["Satu Titik Dibumikan",
+          "Dua Titik Dibumikan",
+          "Beberapa Titik Dibumikan",
+          "Tidak Dibumikan"],
+        "answer": "A"
+      },
+      {
+        "id": 14,
+        "text": "Apabila Arus Melebihi Nilai Tertentu Yang Telah Ditentukan, Alat Proteksi Yang Bertindak Sebagai Respon Terhadap Kenaikan Arus Disebut",
+        "options": ["Proteksi Tegangan Lebih",
+          "Proteksi Arus Lebih",
+          "Proteksi Diferensial Arus",
+          "Proteksi Tegangan Rendah"],
+        "answer": "B"
+      },
+      {
+        "id": 15,
+        "text": "Perlindungan Tanah Mencerminkan …..",
+        "options": ["Tegangan Urutan Negatif, Arus Urutan Nol",
+          "Tegangan Urutan Nol, Arus Urutan Negatif",
+          "Tegangan Urutan Nol Atau Arus Urutan Nol",
+          "Perubahan Perbandingan Tegangan Dan Arus"],
+        "answer": "C"
+      },
+      {
+        "id": 16,
+        "text": "Untuk Menjamin Keselamatan Pribadi, Pembumian Selungkup Logam Yang Tidak Diisi Dalam Kondisi Normal Peralatan Listrik Disebut",
+        "options": ["Pembumian Kerja",
+          "Pembumian Pelindung",
+          "Tidak Pembumian Kerja",
+          "Tidak Pembumian Pelindung"],
+        "answer": "B"
+      },
+      {
+        "id": 17,
+        "text": "Ketika Mode Titik Netral, Arus Gangguan Tanah Adalah Yang Terbesar.",
+        "options": ["Langsung Dibumikan",
+          "Dibumikan Melalui Hambatan",
+          "Dibumikan Melalui Reaktor Penekan Busur Listrik",
+          "Tidak Dibumikan"],
+        "answer": "A"
+      },
+      {
+        "id": 18,
+        "text": "Untuk Generator Yang Beroperasi Normal, Pada Saat Pengaturan Beban Aktif, Terdapat Beban Reaktif Pada Generator",
+        "options": ["Tidak Ada Dampak",
+          "Ada Dampak Tertentu",
+          "Dampak Besar",
+          "Mungkin Tidak Ada Dampak"],
+        "answer": "B"
+      },
+      {
+        "id": 19,
+        "text": "Bila Generator Berosilasi Atau Kehilangan Sinkronisasi, Eksitasi Generator Harus …..",
+        "options": ["Meningkatkan Tegangan Generator",
+          "Daya Reaktif Keluaran Sistem Multi-Arah",
+          "Meningkatkan Gaya Tarik Antara Kutub Magnet Stator Dan Rotor",
+          "Meningkatkan Redaman"],
+        "answer": "C"
+      },
+      {
+        "id": 20,
+        "text": "Jika Katup Uap Utama Turbin Uap Tiba-Tiba Tertutup Selama Pengoperasian, Generator Akan",
+        "options": ["Motor Sinkron",
+          "Motor Asinkron",
+          "Generator Asinkron",
+          "Generator Sinkron"],
+        "answer": "A"
+      },
+      {
+        "id": 21,
+        "text": "Dengan Asumsi Bahwa Daya Aktif Generator Tetap Tidak Berubah, Setelah Peningkatan Eksitasi …..",
+        "options": ["Arus Stator Bertambah",
+          "Arus Stator Berkurang",
+          "Arus Stator Tetap Tidak Berubah",
+          "Rugi-Rugi Berkurang"],
+        "answer": "A"
+      },
+      {
+        "id": 22,
+        "text": "Kenaikan Suhu Yang Diijinkan Generator Terutama Bergantung Pada Generator …..",
+        "options": ["Beban Aktif",
+          "Tegangan Operasi",
+          "Metode Pendinginan",
+          "Kelas Bahan Isolasi"],
+        "answer": "D"
+      },
+      {
+        "id": 23,
+        "text": "Generator Berkapasitas Besar Menggunakan Bus Tertutup Berfasa Yang Tujuan Utamanya Adalah Untuk Mencegah Terjadinya  ….",
+        "options": ["Kelembapan",
+          "Hubungan Pendek Fasa Ke Fasa",
+          ".Sengatan Listrik Pribadi",
+          "Polusi"],
+        "answer": "B"
+      },
+      {
+        "id": 24,
+        "text": "Pena Elektroskop Tegangan Tinggi 10kv Yang Saat Ini DigunakaN berarti …..",
+        "options": ["Dapat Melakukan Uji Listrik Pada Peralatan Hidup Di Bawah 35kv",
+          "Artinya Tegangan Kerja Pena Uji Listrik Adalah 10kv",
+          "Dapat Melakukan Uji Kelistrikan Pada Peralatan Bertegangan Dibawah 6kv",
+          "Dapat Melakukan Uji Kelistrikan Pada Peralatan Apapun"],
+        "answer": "B"
+      },
+      {
+        "id": 25,
+        "text": "Tegangan AC 10 KV mengacu pada (  ) tiga fasa tiga fase AC",
+        "options": ["Tegangan saluran",
+          "Tegangan fasa",
+          "Tegangan listrik",
+          "Tegangan kecil"],
+        "answer": "A"
+      },
+      {
+        "id": 26,
+        "text": "Busing Trafo Adalah Insulasi Antara Kabel Timah Dan …..",
+        "options": ["Belitan Tegangan Tinggi",
+          "Belitan Tegangan Rendah",
+          "Tangki Minyak",
+          "Inti Besi"],
+        "answer": "C"
+      },
+      {
+        "id": 27,
+        "text": "Setelah Terjadi Kecelakaan, Jika Perbaikan Darurat Diperlukan Lebih Dari (….. )H, Perbaikan Tersebut Harus Dialihkan Ke Pekerjaan Pemeliharaan Kecelakaan.",
+        "options": ["2",
+          "3",
+          "4",
+          "5"],
+        "answer": "C"
+      },
+      {
+        "id": 28,
+        "text": "Berikut Ini Yang Bukan Merupakan Proteksi Trafo Tipe Kering",
+        "options": ["Proteksi Arus Cepat",
+          "Proteksi Gas",
+          "Proteksi Arus Berlebih",
+          "Proteksi Suhu Koil Tinggi"],
+        "answer": "B"
+      },
+      {
+        "id": 29,
+        "text": "Bila Sistem Tenaga Listrik Pabrik Diparalelkan Secara Tidak Sinkron, Proteksi Apa Yang Dapat Diaktifkan?",
+        "options": ["Transformator Diferensial",
+          "Transformator Arus Lebih",
+          "Transformator Urutan Nol",
+          "Semua Hal Di Atas"],
+        "answer": "A"
+      },
+      {
+        "id": 30,
+        "text": "Manakah Dari Berikut Ini Yang Bukan Merupakan Proteksi Yang Dikonfigurasi Untuk Transformator Eksitasi?",
+        "options": ["Diferensial",
+          "Urutan Nol",
+          "Arus Berlebih",
+          "Kelebihan Beban"],
+        "answer": "B"
+      },
+      {
+        "id": 31,
+        "text": "Proteksi Kegagalan Pemutus Sirkuit Beroperasi Di …..",
+        "options": ["Ketika Pemutus Sirkuit Menolak Untuk Beroperasi",
+          "Ketika Proteksi Menolak Untuk Beroperasi",
+          "Ketika Pemutus Sirkuit Gagal",
+          "Ketika Sirkuit Kontrol Terputus"],
+        "answer": "A"
+      },
+      {
+        "id": 32,
+        "text": "Kapasitas Daya Reaktif Sistem Tenaga Yang Tidak Mencukupi Pasti Akan Menimbulkan Tegangan",
+        "options": ["Umumnya Menurun",
+          "Meningkat",
+          "Menurun Di Daerah Terpencil",
+          "Meningkat Di Daerah Terpencil"],
+        "answer": "A"
+      },
+      {
+        "id": 33,
+        "text": "Jika Ditemukan Bahwa Tekanan Udara Pada Pemutus Sirkuit Sf6 Sangat Rendah, Anda Harus …..",
+        "options": ["Segera Menonaktifkan Penutupan Kembali",
+          "Segera Membuka Pemutus Arus",
+          "Mengambil Tindakan Untuk Mencegah Tersandung",
+          "Tidak Diperlukan Tindakan Apa Pun"],
+        "answer": "C"
+      },
+      {
+        "id": 34,
+        "text": "Ketika kapasitor diperiksa menggunakan multimeter, jarum penunjuk seharusnya (    ).",
+        "options": ["Diam",
+          "Kembali perlahan",
+          "Berayun maju mundur",
+          "Berayun"],
+        "answer": "B"
+      },
+      {
+        "id": 35,
+        "text": "Peraturan Pabrik Kami Mensyaratkan Bahwa Kenaikan Suhu Yang Diijinkan Dari Busbar Tertutup Adalah (  ), Kenaikan Suhu Yang Diijinkan Dari Cangkang Adalah (    ), Dan Suhu Cangkang Tidak",
+        "options": ["50 C,30 C,65c",
+          "60 C,30 C,65c",
+          "50 C,40 C,65c",
+          "50 C,30 C,75c"],
+        "answer": "B"
+      },
+      {
+        "id": 36,
+        "text": "Alasan Utama Mempercepat Penuaan Isolasi Adalah",
+        "options": ["Tegangannya Terlalu Tinggi",
+          "Arusnya Terlalu Tinggi",
+          "Suhunya Terlalu Tinggi",
+          "Tdak ada alasan"],
+        "answer": "C"
+      },
+      {
+        "id": 37,
+        "text": "Saat Mengganti Sekring Yang Sedang Berjalan, Jika Peralatan Mengalami Pemadaman Listrik",
+        "options": ["Anda Tidak Perlu Memakai Sarung Tangan Isolasi",
+          "Anda Tetap Perlu Memakai Sarung Tangan Isolasi",
+          "Bisa Dipakai Atau Tidak",
+          "Tidak Ada Peraturan Ketat Dalam Peraturan Keselamatan"],
+        "answer": "B"
+      },
+      {
+        "id": 38,
+        "text": "Jika Peralatan Yang Berputar Mengancam Keselamatan Pribadi Dan Peralatan, Anda Harus",
+        "options": ["Nyalakan Peralatan Cadangan Terlebih Dahulu, Lalu Hentikan Peralatan Yang Rusak",
+          "Gunakan Tombol Darurat Untuk Segera Menghentikan Pengoperasian",
+          "Segera Lapor Kepada Atasan",
+          "Aktual Sesuai Dengan Keadaan Saat Itu"],
+        "answer": "B"
+      },
+      {
+        "id": 39,
+        "text": "Saat Mengukur Arus Beban Seimbang Tiga Fasa Dengan Ammeter Tipe Penjepit, Masukkan Kabel Tiga Fasa Ke Dalam Penjepit, Dan Nilai Meteran Yang Ditunjukkan Adalah",
+        "options": ["0",
+          "Nilai Arus Satu Fasa",
+          "Jumlah Aljabar Arus Tiga Fasa",
+          "Tak Terhingga"],
+        "answer": "A"
+      },
+      {
+        "id": 40,
+        "text": "Untuk menghindari gardu trafo tegangan tinggi yang rusak akibat sambaran petir langsung, menyebabkan pemadaman berskala besar, umumnya ( ) dapat digunakan untuk mencegah petir.",
+        "options": ["Penangkal petir",
+          "Arrester tipe katub",
+          "Sistem petir",
+          "penangkal hujan"],
+        "answer": "B"
+      },
+      {
+        "id": 41,
+        "text": "Bila Menggunakan Avometer Tipe Penjepit, Jika Kawat Berinsulasi Dari Rangkaian Yang Diuji Dililitkan Beberapa Kali Secara Seri Pada Inti Penjepit, Nilai Arus Aktual Dari Rangkaian Yang Diuji Adalah",
+        "options": ["Nilai Yang Ditunjukkan Dari Meteran Penjepit",
+          "Nilai Yang Ditunjukkan Dari Meteran Penjepit Dikalikan Dengan Jumlah Putaran",
+          "Nilai Yang Ditunjukkan Pada Meteran Penjepit Dibagi Dengan Jumlah Putaran",
+          "Tidak Dapat Ditentukan Secara Akurat"],
+        "answer": "C"
+      },
+      {
+        "id": 42,
+        "text": "Suhu Baterai Naik. Bila Suhu Sekitar Di Atas (  ), Turunkan Suhu Sekitar.",
+        "options": ["20℃",
+          "30℃",
+          "40℃",
+          ".50℃"],
+        "answer": "C"
+      },
+      {
+        "id": 43,
+        "text": "Trafo Tegangan Dapat Beroperasi Untuk Waktu Yang Lama Dalam Mode Pengenal, Tetapi Trafo Tegangan Tidak Boleh Beroperasi Melebihi (  ) Dalam Keadaan Apa Pun.",
+        "options": ["Arus Terukur",
+          "Tegangan Terukur",
+          "Kapasitas Maksimum",
+          "Kapasitas Terukur"],
+        "answer": "C"
+      },
+      {
+        "id": 44,
+        "text": "Pengaturan arus dari relay termal adalah (  )% dari arus pengenal motor.",
+        "options": ["120",
+          "100",
+          "130",
+          "150"],
+        "answer": "B"
+      },
+      {
+        "id": 45,
+        "text": "Ketika Tekanan Pemutus Arus 220kv Sf6 Mencapai (    ), Pemutus Arus Akan Terkunci Dan Pengoperasian Pemutus Arus Dilarang.",
+        "options": ["0,45mpa",
+          "0,5mpa",
+          "0,55mpa",
+          "0,6mpa"],
+        "answer": "B"
+      },
+      {
+        "id": 46,
+        "text": "Alat yang berfungsi menaikkan tegangan dari generator ke jaringan transmisi adalah …",
+        "options": ["Trafo step-down",
+          "Trafo distribusi",
+          "Trafo instrument",
+          "Trafo step-up"],
+        "answer": "D"
+      },
+      {
+        "id": 47,
+        "text": "Sistem eksitasi pada generator berfungsi untuk …",
+        "options": ["Mengatur kecepatan turbin",
+          "Menghasilkan medan magnet rotor",
+          "Menurunkan arus beban",
+          "Menstabilkan daya"],
+        "answer": "B"
+      },
+      {
+        "id": 48,
+        "text": "Trafo arus (CT) digunakan untuk …",
+        "options": ["Mengukur tegangan tinggi",
+          "Mengubah arus besar menjadi kecil",
+          "Menurunkan tegangan",
+          "Menstabilkan daya"],
+        "answer": "B"
+      },
+      {
+        "id": 49,
+        "text": "AVR (Automatic Voltage Regulator) berfungsi untuk …",
+        "options": ["Mengatur arus beban",
+          "Mengatur tegangan keluaran generator",
+          "Mengatur frekuensi sistem",
+          "Mengamankan PMT"],
+        "answer": "B"
+      },
+      {
+        "id": 50,
+        "text": "Tujuan pengujian tahanan isolasi adalah untuk …",
+        "options": ["Mengetahui kapasitas trafo",
+          "Mengetahui kondisi isolasi peralatan",
+          "Menentukan daya beban",
+          "Mengukur frekuensi"],
+        "answer": "B"
+      },
+      {
+        "id": 51,
+        "text": "Tujuan utama dari keselamatan kerja adalah",
+        "options": ["Mengurangi tingkat kecelakaan",
+          "Mengurangi beban pekerja",
+          "Menambah pendapatan pekerja",
+          "Menyeimbangkan beban pekerja"],
+        "answer": "A"
+      },
+      {
+        "id": 52,
+        "text": "Dibawah ini adalah prinsip K3, kecuali?",
+        "options": ["Setiap pekerjaan bisa dilakukan dengan selamat",
+          "Kecelakaan pasti ada Penyebabnya",
+          "Penyebab kecelakaan harus di cegah/di tiadakan",
+          "Kecelakaan adalah takdir/Nasib"],
+        "answer": "D"
+      },
+      {
+        "id": 53,
+        "text": "Berikut ini merupakan langkah yang dilakukan untuk pencegahan terhadap penyakit, kecuali",
+        "options": ["Pemeriksaan kesehatan karyawan",
+          "Pendidikan kesehatan",
+          "Penjelasan sebelum bekerja",
+          "Golongan fisik"],
+        "answer": "D"
+      },
+      {
+        "id": 54,
+        "text": "Suatu peristiwa yang tidak disengaja seperti kejadian yang tidak diharapkan dan tidak terkontrol yang dapat menyebabkan kerusakan peralatan, material bahkan kecelakaan pada pekerja disebut:",
+        "options": ["Kerugian kerja",
+          "Kerusakan kerja",
+          "Fatal kerja",
+          "Kecelakaan kerja"],
+        "answer": "D"
+      },
+      {
+        "id": 55,
+        "text": "Tujuan pemeriksaan kesehatan sebelum bekerja (awal) adalah :",
+        "options": ["Agar tenaga kerja yang diterima berada dalam kondisi kesehatan yang lebih baik",
+          "Tidak mempunyai penyakit menular yang akan menular tenaga kerja lainnya",
+          "Sebagai bahan acuan dasar dalam penentuan riwayat kesehatan selama bekerja",
+          "Semua jawaban benar"],
+        "answer": "D"
+      },
+      {
+        "id": 56,
+        "text": "Pemeriksaan kesehatan tenaga kerja meliputi :",
+        "options": ["Pemeriksaan kesehatan awal dan berkala",
+          "Pemeriksaan kesehatan berkala dan berjangka",
+          "Pemeriksaan kesehatan awal, berkala dan khusus",
+          "Pemeriksaan kesehatan awal, berjangka dan khusus"],
+        "answer": "C"
+      },
+      {
+        "id": 57,
+        "text": "Penyebab langsung (immediate cause) dari kecelakaan adalah :",
+        "options": ["Tindakan dan Kondisi yang tidak aman",
+          "Faktor individu.",
+          "Faktor pekerjaan",
+          "Faktor pekerjaan dan Faktor individu"],
+        "answer": "A"
+      },
+      {
+        "id": 58,
+        "text": "Metode pemadaman kebakaran meliputi",
+        "options": ["Cooling, Smoothing, Breaking Chain Reaction And Starvation",
+          "Cooling, Smothering and Breaking Chain Reaction",
+          "Cooling, Smothering, Starvation, and Breaking Chain Reaction",
+          "Breaking News Reaction, Cooling, Starvation and Smothering"],
+        "answer": "C"
+      },
+      {
+        "id": 59,
+        "text": "Dibawah ini adalah alasan-alasan kenapa perusahaan harus mengelola safety (keselamatan kerja) ditempat kerja, yaitu:",
+        "options": ["Untuk mencegah cedera pada pekerja",
+          "Untuk meningkatkan keuntungan dan menjaga reputasi perusahaan",
+          "Untuk memenuhi peraturan perundangan yang berlaku",
+          "Semua jawaban benar"],
+        "answer": "D"
+      },
+      {
+        "id": 60,
+        "text": "Dibawah ini yang termasuk Kategori bahaya adalah :",
+        "options": ["Bahaya Ergonomi (stress fisik, Stress Kejiwaan)",
+          "Bahaya Mekanis, Bahaya Kimia, Bahaya Biologi",
+          "Bahaya Psikososial, Bahaya Tingkah Laku, Bahaya Kelistrikan",
+          "Semua jawaban benar"],
+        "answer": "D"
+      },
+      {
+        "id": 61,
+        "text": "Warna merah dalam simbol keselamatan kerja memiliki makna...",
+        "options": ["memberi perintah wajib untuk ditaati",
+          "memberi peringatan dan informasi waspada",
+          "menunjukkan perintah larangan, berhenti",
+          "memiliki arti dalam keadaan aman, dapat melintas"],
+        "answer": "C"
+      },
+      {
+        "id": 62,
+        "text": "Suatu kondisi dimana atau kapan munculnya sumber bahaya telah dapat dikendalikan ke tingkat yang memadai, ini adalah lawan dari bahaya (danger) merupakan pengertian dari",
+        "options": ["Keamanan",
+          "Alat pelindung diri",
+          "Kesehatan",
+          "Kepedulian"],
+        "answer": "A"
+      },
+      {
+        "id": 63,
+        "text": "Apa kepanjangan dari K3?",
+        "options": ["Keselamatan dan Keamanan Kerja",
+          "Keselamatan Kesehatan kerja",
+          "Kesehatan dan Keselamatan kerja",
+          "Kesehatan Keamanan bekerja"],
+        "answer": "C"
+      },
+      {
+        "id": 64,
+        "text": "Berikut adalah Hak Perusahaan, kecuali….",
+        "options": ["Memberikan Perintah Kerja",
+          "Memerintahkan Kerja Lembur",
+          "Mutasi dan demosi",
+          "Menyampaikan Keluh Kesah Dan Saran kepada karyawan"],
+        "answer": "D"
+      },
+      {
+        "id": 65,
+        "text": "Pelanggaran yang termasuk tingkat pelanggaran Surat Peringatan Pertama dan Terakhir (SPPT) adalah...",
+        "options": ["Mangkir",
+          "Mengemudikan unit/alat milik perusahaan tanpa SIM dan SIMPER",
+          "Tidur selama jam kerja",
+          "Mangkir 5 hari berturut-turut"],
+        "answer": "B"
+      },
+      {
+        "id": 66,
+        "text": "Peraturan Perusahaan adalah peraturan tertulis yang dibuat oleh Perusahaan yang memuat pedoman diantaranya tentang….",
+        "options": ["hak dan kewajiban Perusahaan dan Karyawan",
+          "Perselisihan hubungan industrial",
+          "Menciptakan lapangan kerja",
+          "Hak dan kewajiban Pemerintah"],
+        "answer": "A"
+      },
+      {
+        "id": 67,
+        "text": "Sebelum mogok kerja dilakukan, pemberitahuan dilakukan selambat-lambatnya berapa hari?",
+        "options": ["4 hari",
+          "5 hari",
+          "6 hari",
+          "7 hari"],
+        "answer": "D"
+      },
+      {
+        "id": 68,
+        "text": "Berikut ini yang termasuk Hak karyawan adalah, kecuali…",
+        "options": ["Imbal Jasa",
+          "Waktu Istirahat dan Cuti",
+          "Mengundurkan Diri",
+          "Membayar upah"],
+        "answer": "D"
+      }];
+
+    const bankMulti = [{
+      "id": 1,
+      "text": "Setelah sinkronisasi generator, harus mengaktifkan proteksi _____、 _____di panel proteksi AB generator.",
+      "options": ["Arus lebih",
+        "Diferensial",
+        "Tutup MSV",
+        "Proteksi thermal control"],
+      "answer": ["C",
+        "D"]
+    },
+      {
+        "id": 2,
+        "text": "Suhu unit inverter melebihi ______ derajat dan trip; melebihi_______akan mengaktifkan alarm",
+        "options": ["85℃",
+          "90℃",
+          "70℃",
+          "80℃"],
+        "answer": ["A",
+          "D"]
+      },
+      {
+        "id": 3,
+        "text": "Bekerja tanpa pemadaman listrik mengacu pada",
+        "options": ["Pekerjaan yang tidak menyentuh bagian aktif",
+          "Pekerjaan yang tidak memerlukan pemadaman listrik dan tidak mungkin menyentuh bagian konduktif",
+          "Pekerjaan yang dapat dilakukan pada selungkup atau bagian konduktif dari peralatan bertegangan",
+          "Pemeliharaan yang tidak memerlukan pemadaman listrik"],
+        "answer": ["B",
+          "C"]
+      },
+      {
+        "id": 4,
+        "text": "Pekerjaan yang menggunakan tiket kerja jenis pertama",
+        "options": ["Bekerja pada peralatan tegangan tinggi yang memerlukan pemadaman total atau sebagian",
+          "Bekerja pada sistem sekunder dan penerangan yang memerlukan pemadaman tegangan tinggi atau tindakan keselamatan",
+          "Pekerjaan yang memerlukan pemotongan kabel listrik tegangan tinggi",
+          "Pekerjaan lain yang mengharuskan pemutusan listrik atau tindakan keselamatan pada peralatan tegangan tinggi"],
+        "answer": ["A",
+          "B",
+          "C",
+          "D"]
+      },
+      {
+        "id": 5,
+        "text": "Tanggung jawab keselamatan pemegang izin kerja meliputi",
+        "options": ["Memastikan langkah keselamatan pada tiket kerja benar, lengkap, dan sesuai kondisi lapangan",
+          "Memastikan langkah keselamatan di lokasi kerja lengkap dan menambah bila perlu",
+          "Memastikan tidak ada bahaya masuknya tegangan secara tiba-tiba ke peralatan yang diperbaiki",
+          "Mengklarifikasi isi tiket kerja bila terdapat keraguan dan meminta penjelasan tambahan bila diperlukan"],
+        "answer": ["A",
+          "B",
+          "C",
+          "D"]
+      },
+      {
+        "id": 6,
+        "text": "Tanggung jawab keselamatan petugas pengawas",
+        "options": ["Menjelaskan siapa yang diawasi dan ruang lingkup pengawasan",
+          "Menjelaskan langkah keselamatan, titik bahaya, dan pencegahan sebelum bekerja",
+          "Mengawasi kepatuhan terhadap standar dan segera memperbaiki perilaku tidak aman",
+          "Membantu menyelesaikan pekerjaan"],
+        "answer": ["A",
+          "B",
+          "C"]
+      },
+      {
+        "id": 7,
+        "text": "Sebelum pekerjaan pemeliharaan selesai, bila perlu pengujian tegangan kerja, harus memenuhi ketentuan berikut",
+        "options": ["Seluruh personel dievakuasi dari lokasi kerja",
+          "Semua tiket kerja dikembalikan, pengaman sementara dan pembumian dilepas, serta pengaman permanen dipulihkan",
+          "Saklar dapat langsung ditutup atas persetujuan penanggung jawab pekerjaan",
+          "Pengujian dilakukan oleh petugas operasi setelah pemeriksaan menyeluruh"],
+        "answer": ["A",
+          "B",
+          "D"]
+      },
+      {
+        "id": 8,
+        "text": "Cara memutus aliran listrik ke peralatan pemeliharaan",
+        "options": ["Semua sumber daya harus diputus sepenuhnya",
+          "Dilarang bekerja pada peralatan yang hanya diputus oleh pemutus arus",
+          "Sakelar isolasi harus dibuka dan sakelar kereta ditarik ke posisi uji atau inspeksi",
+          "Trafo dan trafo tegangan yang terkait harus diputus di semua sisi"],
+        "answer": ["A",
+          "B",
+          "C",
+          "D"]
+      },
+      {
+        "id": 9,
+        "text": "Personel yang tercantum dalam tiket kerja",
+        "options": ["Penerbit pekerjaan",
+          "Pemimpin pekerjaan",
+          "Pemberi izin kerja",
+          "Penerima pekerjaan"],
+        "answer": ["A",
+          "B",
+          "C"]
+      },
+      {
+        "id": 10,
+        "text": "Peralatan yang harus dimatikan di tempat kerja",
+        "options": ["Peralatan yang sedang dipelihara",
+          "Peralatan yang jaraknya dengan pekerja lebih kecil dari ketentuan",
+          "Peralatan ≤ 35 kV tanpa pengaman meskipun jarak aman tidak terpenuhi",
+          "Peralatan dengan bagian aktif di sekitar pekerja tanpa pengamanan memadai",
+          "Peralatan lain yang perlu dimatikan"],
+        "answer": ["A",
+          "B",
+          "C",
+          "D",
+          "E"]
+      },
+      {
+        "id": 11,
+        "text": "Fungsi sistem elektrik pada PLTU meliput…..",
+        "options": ["Penyaluran daya ke jaringan",
+          "Proteksi peralatan",
+          "Pengaturan tekanan boiler",
+          "Monitoring dan kontrol sistem"],
+        "answer": ["A",
+          "B",
+          "D"]
+      },
+      {
+        "id": 12,
+        "text": "Generator menghasilkan energi listrik dalam bentuk…",
+        "options": ["Arus bolak-balik",
+          "Sistem tiga fasa",
+          "Tegangan rendah 220 V",
+          "Frekuensi 50 Hz"],
+        "answer": ["A",
+          "B",
+          "D"]
+      },
+      {
+        "id": 13,
+        "text": "Sistem eksitasi generator berfungsi untuk ….",
+        "options": ["Membentuk medan magnet rotor",
+          "Mengatur tegangan keluaran",
+          "Menurunkan daya mekanik",
+          "Menjaga stabilitas sistem"],
+        "answer": ["A",
+          "B",
+          "D"]
+      },
+      {
+        "id": 14,
+        "text": "Peralatan yang termasuk sistem proteksi elektrik adalah ….",
+        "options": ["Relay proteksi",
+          "Circuit breaker",
+          "Transformator daya",
+          "Lightning arrester"],
+        "answer": ["A",
+          "B",
+          "D"]
+      },
+      {
+        "id": 15,
+        "text": "Parameter yang harus sama saat sinkronisasi generator adalah….",
+        "options": ["Tegangan",
+          "Frekuensi",
+          "Sudut fasa",
+          "Arus beban"],
+        "answer": ["A",
+          "B",
+          "C"]
+      },
+      {
+        "id": 16,
+        "text": "Pada saat mengukur tahanan isolasi menggunakan megger, ukur rasio penyerapan dengan mencatat nilai tahanan_____dan _____ ",
+        "options": ["15S",
+          "60S",
+          "30S",
+          "50S"],
+        "answer": ["A",
+          "B"]
+      },
+      {
+        "id": 17,
+        "text": "CB tegangan tinggi pada PLTU dapat menggunakan media pemadam",
+        "options": ["SF₆",
+          "Udara tekan",
+          "Minyak",
+          "Air"],
+        "answer": ["A",
+          "B",
+          "C"]
+      },
+      {
+        "id": 18,
+        "text": "Gangguan listrik yang dapat terjadi pada sistem adalah …",
+        "options": ["Hubung singkat",
+          "Gangguan satu fasa ke tanah",
+          "Overload",
+          "Tekanan uap tinggi"],
+        "answer": ["A",
+          "B",
+          "C",
+          "D"]
+      },
+      {
+        "id": 19,
+        "text": "Syarat peralatan listrik dinyatakan aman untuk dikerjakan adalah",
+        "options": ["Bebas tegangan",
+          "Sudah di-grounding",
+          "Beban kecil",
+          "Terpasang LOTO"],
+        "answer": ["A",
+          "B",
+          "D"]
+      },
+      {
+        "id": 20,
+        "text": "Fungsi CT (Current Transformer) adalah …",
+        "options": ["Pengukuran arus",
+          "Proteksi sistem",
+          "Menurunkan tegangan",
+          "Isolasi sistem ukur"],
+        "answer": ["A",
+          "B",
+          "D"]
+      },
+      {
+        "id": 21,
+        "text": "Switching listrik harus dilakukan berdasarkan…",
+        "options": ["Perintah lisan tanpa dokumen",
+          "Switching order",
+          "SOP yang berlaku",
+          "Koordinasi operator"],
+        "answer": ["A",
+          "B",
+          "C"]
+      },
+      {
+        "id": 22,
+        "text": "Kesalahan switching dapat menyebabkan",
+        "options": ["Blackout",
+          "Kecelakaan kerja",
+          "Kerusakan peralatan",
+          "Efisiensi meningkat"],
+        "answer": ["A",
+          "B",
+          "C"]
+      },
+      {
+        "id": 23,
+        "text": "Fungsi SCADA yaitu…",
+        "options": ["Monitoring sistem",
+          "Kontrol jarak jauh",
+          "Proteksi mekanik",
+          "Pencatatan data operasi"],
+        "answer": ["A",
+          "B",
+          "D"]
+      },
+      {
+        "id": 24,
+        "text": "Kondisi tidak normal yang harus segera dilaporkan adalah",
+        "options": ["Bunyi tidak normal pada peralatan",
+          "Tegangan dan arus normal",
+          "Indikasi alarm proteksi",
+          "Bau terbakar"],
+        "answer": ["A",
+          "C",
+          "D"]
+      },
+      {
+        "id": 25,
+        "text": "Pemeliharaan sistem listrik bertujuan untuk ….",
+        "options": ["Meningkatkan risiko operasi",
+          "Menjaga keandalan sistem",
+          "Mencegah gangguan",
+          "Memperpanjang umur peralatan"],
+        "answer": ["A",
+          "B",
+          "C"]
+      },
+      {
+        "id": 26,
+        "text": "Sistem busbar berfungsi untuk…",
+        "options": ["Distribusi daya",
+          "Penghubung antar feeder",
+          "Pendinginan sistem",
+          "Fleksibilitas operasi"],
+        "answer": ["A",
+          "B",
+          "D"]
+      },
+      {
+        "id": 27,
+        "text": "Indikator penting kondisi CB tegangan tinggi adalah …",
+        "options": ["Tekanan gas",
+          "Status ON/OFF",
+          "indikator pegas",
+          "warna cat"],
+        "answer": ["A",
+          "B",
+          "C"]
+      },
+      {
+        "id": 28,
+        "text": "Faktor penyebab gangguan saluran transmisi adalah …",
+        "options": ["Petir",
+          "Pohon atau benda asing",
+          "Beban berlebih",
+          "Cuaca ekstrem"],
+        "answer": ["A",
+          "B",
+          "D"]
+      },
+      {
+        "id": 29,
+        "text": "Normalisasi sistem listrik setelah pekerjaan meliputi …",
+        "options": ["Melepas grounding",
+          "Melepas LOTO",
+          "Mengembalikan peralatan ke kondisi operasi",
+          "Meninggalkan lokasi"],
+        "answer": ["A",
+          "B",
+          "C"]
+      },
+      {
+        "id": 30,
+        "text": "Relay proteksi dapat bekerja berdasarkan parameter …",
+        "options": ["Arus",
+          "Tegangan",
+          "Suhu",
+          "Impedansi"],
+        "answer": ["A",
+          "B",
+          "D"]
+      },
+      {
+        "id": 31,
+        "text": "Fungsi PT / CVT pada sistem adalah…",
+        "options": ["Pengukuran tegangan",
+          "Proteksi tegangan",
+          "Pengaturan daya",
+          "Media komunikasi PLC"],
+        "answer": ["A",
+          "B",
+          "D"]
+      },
+      {
+        "id": 32,
+        "text": "Padat saat peralatan belum diputuskan aliran listriknya, jarak yang aman untuk 10 KV adalah ______Meter, 35 KV______Meter",
+        "options": ["0.5",
+          "0,7",
+          "1,5",
+          "1"],
+        "answer": ["B",
+          "D"]
+      },
+      {
+        "id": 33,
+        "text": "Fungsi trafo utama (GSU) pada PLTU adalah …",
+        "options": ["Menaikkan tegangan generator",
+          "Menyalurkan daya ke sistem transmisi",
+          "Menurunkan frekuensi",
+          "Mengisolasi sistem generator"],
+        "answer": ["A",
+          "B",
+          "D"]
+      },
+      {
+        "id": 34,
+        "text": "APAR yang disediakan di suatu lokasi hanya efektif untuk memadamkan benda yang baru terbakar karena ;",
+        "options": ["Jumlah APAR terbatas",
+          "Mampu memadamkan kebakaran",
+          "jangka semprot yang lama",
+          "Jarak semprot yang terbatas"],
+        "answer": ["A",
+          "D"]
+      },
+      {
+        "id": 35,
+        "text": "Contoh pemadaman api dengan cara Starvation adalah :",
+        "options": ["Menutup drum yang terbakar",
+          "Memadamkan api dengan air",
+          "Menghentikan supply bahan bakar",
+          "Memutuskan aliran bahan bakar yang menuju tempat kebakaran"],
+        "answer": ["C",
+          "D"]
+      },
+      {
+        "id": 36,
+        "text": "Berikut manakah yang merupakan prinsip K3...",
+        "options": ["Langkah keselamatan seadanya",
+          "Setiap pekerjaan bisa dilakukan dengan selama",
+          "Kecelakaan pasti ada penyebabnya",
+          "Penyebab kecelakaan harus di cegah/di tiadakan"],
+        "answer": ["B",
+          "C",
+          "D"]
+      },
+      {
+        "id": 37,
+        "text": "Cidera yang umum terjadi pada konstruksi bangunan yaitu....",
+        "options": ["Cidera akibat sengatan listrik",
+          "Cidera akibat kebisingan",
+          "Cidera akibat jatuh dari ketinggian",
+          "Cidera akibat mekanisme peralatan",
+          "Cidera akibat hantaman benda"],
+        "answer": ["A",
+          "C",
+          "D",
+          "E"]
+      },
+      {
+        "id": 38,
+        "text": "Contoh dibawah ini yang termasuk kondisi tidak aman adalah kecuali:",
+        "options": ["Perkakas atau peralatan rusak",
+          "Mengoperasikan kendaraan dengan ugal-ugalan",
+          "Bersenda gurau sambil bekerja",
+          "Tempat kerja Penuh Ceceran Oli"],
+        "answer": ["B",
+          "C"]
+      },
+      {
+        "id": 39,
+        "text": "Syarat-syarat helm untuk alat pelindung diri, yaitu...",
+        "options": ["Tahan benturan",
+          "Meredam kejutan",
+          "Tidak mudah terbakar",
+          "Mudah disesuaikan",
+          "Anti air"],
+        "answer": ["A",
+          "B",
+          "C",
+          "D"]
+      },
+      {
+        "id": 40,
+        "text": "Berikut yang bertanggung jawab terhadap K3 di tempat kerja yaitu...",
+        "options": ["Manajemen",
+          "Pengawas",
+          "Petugas K3",
+          "Investor",
+          "Masyarakat sekitar"],
+        "answer": ["A",
+          "B",
+          "C"]
+      },
+      {
+        "id": 41,
+        "text": "Berikut sanksi-sanksi yang diberlakukan di Perusahaan ?",
+        "options": ["Surat Teguran",
+          "Surat Peringatan I",
+          "Surat Peringatan II",
+          "Surat Peringatan III",
+          "Pemutusan Hubungan Kerja"],
+        "answer": ["B",
+          "C",
+          "D",
+          "E"]
+      },
+      {
+        "id": 42,
+        "text": "Manakah pelanggaran yang dapat diberikan Surat Peringatan I?",
+        "options": ["Mangkir kerja 2 (dua) hari",
+          "Makan selama jam kerja tanpa seizin atasan",
+          "Menolak mutasi tanpa alasan yang dapat diterima",
+          "Berpakaian tidak sopan di tempat umum"],
+        "answer": ["A",
+          "B",
+          "D"]
+      },
+      {
+        "id": 43,
+        "text": "Berikut hal-hal yang perlu dilaksanakan ketika masuk bekerja:",
+        "options": ["Karyawan wajib menggunakan alat pelindung diri selama bekerja.",
+          "Karyawan wajib memakai kartu identitas (ID Card).",
+          "Karyawan wajib melakukan absensi manual dan absensi sidik jari/wajah.",
+          "Karyawan wajib datang tepat waktu ke lokasi kerja.",
+          "Karyawan wajib meminjamkan APD kepada rekan kerja."],
+        "answer": ["A",
+          "B",
+          "C",
+          "D"]
+      },
+      {
+        "id": 44,
+        "text": "Berikut merupakan kewajiban perusahaan yang diatur dalam Peraturan Perusahaan:",
+        "options": ["Perusahaan wajib membayarkan utang karyawan.",
+          "Perusahaan wajib membagikan dan menjelaskan Perjanjian Kerja Bersama/Peraturan Perusahaan kepada karyawan.",
+          "Perusahaan wajib menyelenggarakan sistem manajemen kerja dan membayar upah sesuai perjanjian.",
+          "Perusahaan wajib menyesuaikan sistem manajemen kinerja, struktur, dan skala upah apabila terjadi perubahan upah tahunan.",
+          "Perusahaan wajib menyediakan seragam kerja yang layak kepada karyawan."],
+        "answer": ["B",
+          "C",
+          "D",
+          "E"]
+      },
+      {
+        "id": 45,
+        "text": "Berikut merupakan hak karyawan yang diatur dalam Peraturan Perusahaan",
+        "options": ["Karyawan berhak mendapatkan imbal jasa berupa upah atau bentuk lain atas pekerjaan yang dilakukannya.",
+          "Karyawan berhak mendapatkan waktu istirahat kerja dan cuti sebagaimana diatur dalam Perjanjian Kerja Bersama/Peraturan Perusahaan.",
+          "Masuk bekerja tanpa mengikuti pengaturan kerja dari perusahaan.",
+          "Karyawan berhak mendapatkan bantuan dari perusahaan ketika menghadapi permasalahan atau ancaman.",
+          "Karyawan berhak mengundurkan diri dengan mengikuti prosedur pengunduran diri sesuai Perjanjian Kerja Bersama/Peraturan Perusahaan."],
+        "answer": ["A",
+          "B",
+          "D",
+          "E"]
+      }];
+
+    const bankBenarSalah = [{
+      "id": 1,
+      "text": "Kecepatan rotor generator turbin relatif tinggi, dan rotornya umumnya menggunakan struktur kutub tersembunyi.",
+      "answer": 1
+    },
+      {
+        "id": 2,
+        "text": "Motor asinkron tidak dapat berputar bila dihubungkan dengan catu daya DC, dan hanya dapat berputar bila dihubungkan dengan catu daya AC.",
+        "answer": 1
+      },
+      {
+        "id": 3,
+        "text": "Semakin kecil celah udara antara stator dan rotor motor asinkron, semakin baik.",
+        "answer": 0
+      },
+      {
+        "id": 4,
+        "text": "Tegangan pengenal yang tertera pada papan nama pemutus arus tegangan tinggi adalah tegangan kerja maksimum yang diizinkan.",
+        "answer": 0
+      },
+      {
+        "id": 5,
+        "text": "Trafo tegangan mengubah tegangan tinggi menjadi tegangan rendah, sehingga belitan primer memiliki banyak lilitan dan belitan sekunder memiliki sedikit lilitan.",
+        "answer": 1
+      },
+      {
+        "id": 6,
+        "text": "Tujuan pemasangan reaktor adalah untuk menjaga tegangan sisa busbar.",
+        "answer": 1
+      },
+      {
+        "id": 7,
+        "text": "Sistem catu daya tegangan menengah dan rendah pada pembangkit listrik umumnya menggunakan sistem tiga fasa empat kawat dan menghasilkan dua tingkat tegangan, yaitu 380/220 V.",
+        "answer": 1
+      },
+      {
+        "id": 8,
+        "text": "Saat reaktor beroperasi dan suhu lingkungan melebihi 35°C, arus operasi tidak boleh melebihi arus pengenal.",
+        "answer": 1
+      },
+      {
+        "id": 9,
+        "text": "Saat memulai pengukuran resistansi isolasi, pegangan generator diputar perlahan; saat pengukuran, kecepatan putaran harus mencapai 120 putaran per menit agar alat tidak rusak dan hasil pengukuran akurat.",
+        "answer": 1
+      },
+      {
+        "id": 10,
+        "text": "Saat menggunakan multimeter untuk mengukur resistansi, cukup mengatur multimeter pada rentang resistansi yang sesuai dan nilai yang ditunjukkan langsung merupakan nilai resistansi terukur.",
+        "answer": 0
+      },
+      {
+        "id": 11,
+        "text": "Generator sinkron menghasilkan tegangan listrik AC dan bekerja dengan kecepatan putar yang sebanding dengan frekuensi sistem.",
+        "answer": 1
+      },
+      {
+        "id": 12,
+        "text": "Motor induksi tiga fasa banyak digunakan di industri karena konstruksinya sederhana dan perawatannya relatif mudah.",
+        "answer": 1
+      },
+      {
+        "id": 13,
+        "text": "Semakin besar celah udara antara stator dan rotor motor listrik, maka efisiensi motor akan semakin tinggi.",
+        "answer": 0
+      },
+      {
+        "id": 14,
+        "text": "Pemutus arus (circuit breaker) berfungsi untuk memutus dan menghubungkan rangkaian listrik dalam kondisi berbeban maupun gangguan.",
+        "answer": 1
+      },
+      {
+        "id": 15,
+        "text": "Tegangan pengenal pada peralatan listrik boleh dilampaui selama waktu pemakaian singkat.",
+        "answer": 0
+      },
+      {
+        "id": 16,
+        "text": "Transformator bekerja berdasarkan prinsip induksi elektromagnetik.",
+        "answer": 1
+      },
+      {
+        "id": 17,
+        "text": "Sistem pentanahan bertujuan untuk melindungi manusia dan peralatan dari bahaya tegangan sentuh.",
+        "answer": 1
+      },
+      {
+        "id": 18,
+        "text": "Alat ukur multimeter hanya dapat digunakan untuk mengukur tegangan listrik saja.",
+        "answer": 0
+      },
+      {
+        "id": 19,
+        "text": "Sebelum melakukan pekerjaan pemeliharaan peralatan listrik, sumber tegangan harus dipastikan dalam kondisi tidak bertegangan.",
+        "answer": 1
+      },
+      {
+        "id": 20,
+        "text": "Pemeliharaan preventif dilakukan untuk mencegah terjadinya kerusakan sebelum peralatan mengalami gangguan.",
+        "answer": 1
+      },
+      {
+        "id": 21,
+        "text": "Pekerjaan instalasi listrik boleh dilakukan tanpa izin kerja selama tegangan di bawah 220 volt.",
+        "answer": 0
+      },
+      {
+        "id": 22,
+        "text": "PT adalah potensi transformator yang fungsinya untuk mengukur mengkuru pada rotor.",
+        "answer": 0
+      },
+      {
+        "id": 23,
+        "text": "Hubungan arus pendek tidak dapat menyebabkan kerusakan pada peralatan listrik.",
+        "answer": 0
+      },
+      {
+        "id": 24,
+        "text": "Penggunaan alat pelindung diri yang sesuai dapat mengurangi risiko kecelakaan kerja di area kelistrikan.",
+        "answer": 1
+      },
+      {
+        "id": 25,
+        "text": "Pemeriksaan peralatan listrik secara berkala dapat membantu mencegah terjadinya kecelakaan kerja.",
+        "answer": 1
+      },
+      {
+        "id": 26,
+        "text": "Simbol K3 yang berwarna kuning menandakan peringatan kewaspadaan",
+        "answer": 1
+      },
+      {
+        "id": 27,
+        "text": "Upaya pencegahan lebih baik daripada upaya pengobatan terhadap kecelakaan atau akibat kerja, sebagai alternatif terakhir dari pencegahan dalam hirarki pengendalian bahaya adalah Alat Pelindung Diri.",
+        "answer": 1
+      },
+      {
+        "id": 28,
+        "text": "Pekerja yang perlu waktu menyelesaikan pekerjaan 5-10 menit tidak perlu menggunakan APD.",
+        "answer": 0
+      },
+      {
+        "id": 29,
+        "text": "Tindakan pembetulan dan pencegahan yang mendasar merupakan salah satu keuntungan dari Inspeksi",
+        "answer": 1
+      },
+      {
+        "id": 30,
+        "text": "Safety line kuning artinya area berbahaya dimana setiap orang yang melintas harus berhati-hati",
+        "answer": 1
+      },
+      {
+        "id": 31,
+        "text": "Setiap kecelakaan yang terjadi, maka akan ada rekomendasi atau tindakan perbaikan dari kecelakaan tersebut, tujuan dari rekomendasi tindakan perbaikan adalah Agar kecelakaan Tersebut Tidak Terulang Kembali",
+        "answer": 1
+      },
+      {
+        "id": 32,
+        "text": "Warna biru yang digunakan dalam sign menandakan “Kewajiban”",
+        "answer": 1
+      },
+      {
+        "id": 33,
+        "text": "Peraturan Perusahaan adalah peraturan tertulis yang dibuat oleh Perusahaan yang memuat pedoman diantaranya tentang hak dan kewajiban Perusahaan dan Karyawan",
+        "answer": 1
+      },
+      {
+        "id": 34,
+        "text": "Mangkir 2 hari dapat dikenakan sanski Surat Peringatan III",
+        "answer": 0
+      },
+      {
+        "id": 35,
+        "text": "Karyawan tidak dibenarkan mengoperasikan unit atau alat tanpa memiliki SIMPER.",
+        "answer": 1
+      },
+      {
+        "id": 36,
+        "text": "Mangkir selama 1 hari dapat dikenakan sanksi Surat Teguran.",
+        "answer": 0
+      },
+      {
+        "id": 37,
+        "text": "Masa berlaku Surat Peringatan I, Surat Peringatan II, dan Surat Peringatan III adalah 6 bulan.",
+        "answer": 1
+      }];
+
+    // --- VUE APP ---
+    const {
+      createApp,
+      ref,
+      reactive,
+      computed
+    } = Vue;
+
+    createApp({
+      setup() {
+        const letterToIndex = {
+          'A': 0, 'B': 1, 'C': 2, 'D': 3, 'E': 4, 'F': 5, 'G': 6
+        };
+
+        const categories = {
+          'pilihanGanda': {
+            title: 'Pilihan Ganda', icon: 'fas fa-list-ul', data: bankPilihanGanda, type: 'single'
+          },
+          'multi': {
+            title: 'Multi Jawaban', icon: 'fas fa-check-double', data: bankMulti, type: 'multiple'
+          },
+          'benarSalah': {
+            title: 'Benar / Salah', icon: 'fas fa-balance-scale', data: bankBenarSalah, type: 'boolean'
+          }
+        };
+
+        // State is persistent per category
+        const state = reactive({
+          pilihanGanda: {
+            currentIndex: 0, isFinished: false, score: 0, wrongQuestions: [], clickedStatus: {}, firstAttempt: true
+          },
+          multi: {
+            currentIndex: 0, isFinished: false, score: 0, wrongQuestions: [], clickedStatus: {}, firstAttempt: true
+          },
+          benarSalah: {
+            currentIndex: 0, isFinished: false, score: 0, wrongQuestions: [], clickedStatus: {}, firstAttempt: true
+          }
+        });
+
+        const currentCategory = ref('pilihanGanda');
+        const isTransitioning = ref(false);
+
+        // Computed Data
+        const activeState = computed(() => state[currentCategory.value]);
+        const activeData = computed(() => categories[currentCategory.value].data);
+        const currentQuestion = computed(() => activeData.value[activeState.value.currentIndex] || {});
+        const categoryType = computed(() => categories[currentCategory.value].type);
+        const categoryTitle = computed(() => categories[currentCategory.value].title);
+        const totalQuestions = computed(() => activeData.value.length);
+        const progressPercent = computed(() => (activeState.value.currentIndex / totalQuestions.value) * 100);
+
+        // Fitur Ulangi Kategori
+        const retryCategory = () => {
+          const cat = currentCategory.value;
+          state[cat].currentIndex = 0;
+          state[cat].isFinished = false;
+          state[cat].score = 0;
+          state[cat].wrongQuestions = [];
+          state[cat].clickedStatus = {};
+          state[cat].firstAttempt = true;
+        };
+
+        // Option Interaction Logic
+        const selectOption = (index) => {
+          if (isTransitioning.value || activeState.value.clickedStatus[index] === 'correct') return;
+
+          const q = currentQuestion.value;
+          const type = categoryType.value;
+          let isCorrect = false;
+
+          if (type === 'single') {
+            isCorrect = (index === letterToIndex[q.answer]);
+          } else if (type === 'boolean') {
+            isCorrect = (index === q.answer);
+          } else if (type === 'multiple') {
+            const correctIndexes = q.answer.map(l => letterToIndex[l]);
+            isCorrect = correctIndexes.includes(index);
+          }
+
+          if (isCorrect) {
+            activeState.value.clickedStatus[index] = 'correct';
+
+            if (type === 'multiple') {
+              const correctIndexes = q.answer.map(l => letterToIndex[l]);
+              const foundAll = correctIndexes.every(idx => activeState.value.clickedStatus[idx] === 'correct');
+              if (foundAll) {
+                handleSuccess();
+              }
+            } else {
+              handleSuccess();
+            }
+          } else {
+            // Wrong Choice
+            activeState.value.clickedStatus[index] = 'wrong';
+
+            // Record evaluation if it's the very first mistake on this question
+            if (activeState.value.firstAttempt) {
+              activeState.value.wrongQuestions.push({
+                originalIndex: activeState.value.currentIndex,
+                question: currentQuestion.value,
+                type: type
+              });
+              activeState.value.firstAttempt = false;
+            }
+          }
+        };
+
+        const handleSuccess = () => {
+          // Give point if it was answered correctly on first try
+          if (activeState.value.firstAttempt) {
+            activeState.value.score++;
+          }
+
+          isTransitioning.value = true;
+
+          // Simple delay without animation overlays
+          setTimeout(() => {
+            if (activeState.value.currentIndex < totalQuestions.value - 1) {
+              activeState.value.currentIndex++;
+              activeState.value.clickedStatus = {};
+              activeState.value.firstAttempt = true;
+            } else {
+              activeState.value.isFinished = true;
+            }
+            isTransitioning.value = false;
+          },
+            800);
+        };
+
+        // Evaluasi text format
+        const getCorrectAnswerText = (item) => {
+          const q = item.question;
+          if (item.type === 'single') return q.options[letterToIndex[q.answer]];
+          if (item.type === 'multiple') return q.answer.map(l => q.options[letterToIndex[l]]).join(', ');
+          if (item.type === 'boolean') return q.answer === 1 ? 'Benar': 'Salah';
+          return '';
+        };
+
+        // Styling Helpers
+        const getOptionClass = (index) => {
+          const status = activeState.value.clickedStatus[index];
+          if (status === 'correct') return 'border-emerald-500 bg-emerald-50 text-emerald-900 shadow-sm';
+          if (status === 'wrong') return 'border-red-500 bg-red-50 text-red-900 line-through decoration-red-300 opacity-70';
+          return 'border-slate-200 hover:border-blue-400 hover:bg-slate-50 text-slate-700 bg-white hover:shadow-sm';
+        };
+
+        // Desain Benar / Salah (True/False)
+        const getBooleanClass = (index) => {
+          const status = activeState.value.clickedStatus[index];
+          if (status === 'correct') return 'border-emerald-500 bg-emerald-500 text-white shadow-md';
+          if (status === 'wrong') return 'border-red-500 bg-red-50 text-red-700 line-through decoration-red-400 opacity-70';
+
+          // Default style
+          if (index === 1) return 'border-slate-200 text-slate-700 hover:border-emerald-500 hover:bg-emerald-50 hover:text-emerald-700 bg-white';
+          if (index === 0) return 'border-slate-200 text-slate-700 hover:border-red-500 hover:bg-red-50 hover:text-red-700 bg-white';
+        };
+
+        const getIconWrapperClass = (index, isSquare = false) => {
+          const status = activeState.value.clickedStatus[index];
+          const baseRadius = isSquare ? 'rounded': 'rounded-full';
+          if (status === 'correct') return `border-emerald-500 bg-emerald-500 text-white shadow-inner ${baseRadius}`;
+          if (status === 'wrong') return `border-red-500 bg-red-500 text-white ${baseRadius}`;
+          return `border-slate-300 group-hover:border-blue-400 bg-white text-transparent ${baseRadius}`;
+        };
+
+        const getIconClass = (index, defaultIcon = null) => {
+          const status = activeState.value.clickedStatus[index];
+          if (status === 'correct') return 'fas fa-check text-sm';
+          if (status === 'wrong') return 'fas fa-times text-sm';
+          return defaultIcon || '';
+        };
+
+        return {
+          categories,
+          state,
+          currentCategory,
+          activeState,
+          categoryType,
+          categoryTitle,
+          currentQuestion,
+          totalQuestions,
+          progressPercent,
+          isTransitioning,
+          selectOption,
+          retryCategory,
+          getCorrectAnswerText,
+          getOptionClass,
+          getBooleanClass,
+          getIconWrapperClass,
+          getIconClass
+        };
+      }
+    }).mount('#app');
+  </script>
+</body>
+</html>
